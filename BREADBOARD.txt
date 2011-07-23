@@ -1,0 +1,10 @@
+(very rough at this point -- just describing how I have breadboard set up).
+
+- 5V to power rail
+- Gnd to ground rail
+
+- Sleeve of jack (TYPE?) to +5V, via resistor
+- Left of jack to Gnd, via restior
+   - On same row, hookup wire to 7
+- Right of jack to Gnd, via resistor
+   - On same row, hookup wire to 6
