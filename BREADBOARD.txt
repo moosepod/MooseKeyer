@@ -8,3 +8,9 @@
    - On same row, hookup wire to 7
 - Right of jack to Gnd, via resistor
    - On same row, hookup wire to 6
+(for testing w/o speaker)
+- Pin 5 to LED, LED to ground
+   - Pin 5 to 1B
+   - +ve terminal of LED in E1
+   - -ve termimnal of LED in E4
+   - Resistor from B2 to ground rail
