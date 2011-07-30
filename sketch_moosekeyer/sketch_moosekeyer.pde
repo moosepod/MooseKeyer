@@ -28,6 +28,7 @@
 #define STATE_KEYER_WAITING        0
 #define STATE_SENDING_CW           1
 #define STATE_KEYER_BOTH_PRESSED   2
+#define STATE_CW_PAUSE             3
 
 // Global variablews
 int co_tone         = 700;
@@ -38,7 +39,7 @@ int right_len       = 0;
 int last_pressed    = LEFT_PADDLE;
 int state           = STATE_KEYER_WAITING;
 int base_state      = STATE_KEYER_WAITING;
-int stop_cw_at      = 0;
+long stop_cw_at     = 0;
 
 void debug_log(char *m) {
   Serial.println(m);
@@ -75,43 +76,10 @@ void setup() {
   setup_for_wpm(INITIAL_WPM);
 }
 
-void send_cw(int length) {
-  digitalWrite(ACTIVITY_LED,HIGH);
-  tone(TONE_OUT, co_tone);
-  delay(length);
-  noTone(TONE_OUT);
-  digitalWrite(ACTIVITY_LED,LOW);
-  
-  // Add the spacing
-  delay(dit_in_ms);
-}
-
-void both_pressed() {
-  debug_log("B");
-  if (last_pressed == LEFT_PADDLE) {
-    right_pressed();
-    left_pressed();
-  } else {
-    left_pressed();
-    right_pressed();
-  }
-  debug_log("  end b");
-}
-
-void left_pressed() {
-  debug_log("L");
-  send_cw(left_len);
-  last_pressed = LEFT_PADDLE;
-}
-
-void right_pressed() {
-  debug_log("R");
-  send_cw(right_len);
-  last_pressed = RIGHT_PADDLE;
-}
-
+// If we're not already sending a CW pulse, start a pulse and set the timeout
+// for the appropriate length
 void start_cw(int length) {
-  if (state != STATE_SENDING_CW) {
+  if (state != STATE_SENDING_CW) {    
     digitalWrite(ACTIVITY_LED,HIGH);
     tone(TONE_OUT, co_tone, 1000); // Never send tone longer than a second...
     stop_cw_at = millis() + length;
@@ -119,18 +87,21 @@ void start_cw(int length) {
   }
 }
 
+// Stop sending a pulse and shift to pausing between dit/dahs
 void stop_cw() {
-    state = base_state;
+    state = STATE_CW_PAUSE;
     noTone(TONE_OUT);
     digitalWrite(ACTIVITY_LED,LOW);
-    delay(dit_in_ms);
+    stop_cw_at = millis() + dit_in_ms;
 }
 
+// Start the appropriate CW pulse for the left paddle
 void start_cw_left() {
    start_cw(left_len);
    last_pressed = LEFT_PADDLE;
 }
 
+// Start the appropriate CW pulse for the right paddle
 void start_cw_right() {
   start_cw(right_len);
   last_pressed = RIGHT_PADDLE;
@@ -143,6 +114,7 @@ void loop() {
   // Challenge -- single press actualy becomes double press, as long as other paddle is pressed while down.
   switch (state) {
     case STATE_KEYER_WAITING:
+      // Waiting for paddle press in CW mode
       if (left == HIGH) {
           start_cw_left();
       } else if (right == HIGH) {
@@ -150,16 +122,27 @@ void loop() {
       }
       break;
     case STATE_SENDING_CW:
-      if (millis() > stop_cw_at) {
-        stop_cw();
-      }
-      
+      // Currently sending CW dit/dahs 
       if (left == HIGH && right == HIGH) {
           base_state = STATE_KEYER_BOTH_PRESSED;
       }
-      
+
+      if (millis() > stop_cw_at) {
+        stop_cw();
+      }
+      break;
+    case STATE_CW_PAUSE:
+      // Pausing between CW dit/dahs
+      if (left == HIGH && right == HIGH) {
+         base_state = STATE_KEYER_BOTH_PRESSED;
+      }
+
+      if (millis() > stop_cw_at) {
+        state = base_state;
+      }
       break;
     case STATE_KEYER_BOTH_PRESSED:
+      // Both paddles are down while sending CW
       if (last_pressed == LEFT_PADDLE) {
         start_cw_right();
       } else {
@@ -169,5 +152,6 @@ void loop() {
       if (left == LOW || right == LOW) {
         base_state = STATE_KEYER_WAITING;
       }
+      break;
   }
 }
