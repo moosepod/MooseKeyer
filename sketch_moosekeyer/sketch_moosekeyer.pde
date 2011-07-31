@@ -18,10 +18,6 @@
 // = dit dah dah dit (dit) dit dah (dit) dit dah dit (dit) dit dit (dit) dit dit dit (dah)
 #define CANONICAL_WORD (DIT + DAH + DAH + DIT + DIT + DIT + DAH + DIT + DIT + DAH + DIT + DIT + DIT + DIT + DIT + DIT + DIT + DIT + DAH)
 
-// Max size of a morse code char in dits/dahs. Position 7 
-// is just used to flag a chart that is too long and thus not valid.
-#define CHAR_BUFFER_SIZE 7
-
 // Pin definitions
 #define LEFT_IN        7
 #define RIGHT_IN       6
@@ -34,7 +30,7 @@
 #define STATE_KEYER_BOTH_PRESSED   2
 #define STATE_CW_PAUSE             3
 
-// Global variablews
+// Global variables
 int co_tone          = 700;
 int wpm              = 0;
 int dit_in_ms        = 0;
@@ -47,8 +43,8 @@ int cw_was_sent      = 0;
 int state            = STATE_KEYER_WAITING;
 int base_state       = STATE_KEYER_WAITING;
 long stop_cw_at      = 0;
-int char_buffer[CHAR_BUFFER_SIZE];
-int char_buffer_idx = 0;
+byte ditdah_buffer   = B00000000;
+int ditdah_buffer_len = 0;
 
 void debug_log(char *m) {
   Serial.println(m);
@@ -83,24 +79,24 @@ void setup() {
   pinMode(ACTIVITY_LED, OUTPUT);
   
   Serial.begin(9600);
-  clear_char_buffer();
+  clear_ditdah_buffer();
   setup_for_wpm(INITIAL_WPM);
 }
 
 // Append a dit/dah to our current buffer
-void add_to_char_buffer(int x) {
-  if (char_buffer_idx >= 0 && char_buffer_idx < CHAR_BUFFER_SIZE) {
-    char_buffer[char_buffer_idx] = x;
-    char_buffer_idx -= 1;
+void add_to_ditdah_buffer(int x) {
+  if (ditdah_buffer_len < 8) {
+    ditdah_buffer_len +=1;
+    if (x == DAH) {
+       bitSet(ditdah_buffer,8-ditdah_buffer_len);
+    }
   }
 }
 
-// Clear the char buffer
-void clear_char_buffer() {
-   char_buffer_idx = CHAR_BUFFER_SIZE-1;
-   for (int i = 0; i < CHAR_BUFFER_SIZE; i++) {
-       char_buffer[i] = 0;
-   }
+// Clear the ditdah buffer
+void clear_ditdah_buffer() {
+   ditdah_buffer = B00000000;
+   ditdah_buffer_len = 0;
 }
 
 // If we're not already sending a CW pulse, start a pulse and set the timeout
@@ -116,9 +112,9 @@ void start_cw(int length) {
     state = STATE_SENDING_CW;
     
     if (length == dit_in_ms) {
-        add_to_char_buffer(DIT);
+        add_to_ditdah_buffer(DIT);
     } else {
-        add_to_char_buffer(DAH);
+        add_to_ditdah_buffer(DAH);
     }
   }
 }
@@ -137,20 +133,29 @@ void start_cw_left() {
    last_pressed = LEFT_PADDLE;
 }
 
-void handle_space() {
-  Serial.write("Space: ");
-  for (int i = 0; i < char_buffer_idx; i++) {
-    if (char_buffer[i] == DAH) {
-      Serial.print('_');
-    } else if (char_buffer[i] == DIT) {
-      Serial.print('.');
-    }
-    else {
-      Serial.print(' ');
+// Convert a byte ditdah buffer into dits and dahs
+char* ditdah_to_cw(byte ditdah, int len) {
+  char cw[8];
+  
+  int i = 0;
+  
+  for (i = 0; i < len; i++) {
+    if (bitRead(ditdah,7-i)==1) {
+      cw[i] = '-';
+    } else {
+      cw[i] = '.';
     }
   }
-  Serial.println(" ");
-  clear_char_buffer();
+  
+  cw[i] = '\0';
+  
+  return cw;
+}
+
+void handle_new_char() {
+  Serial.write("Char: ");
+  Serial.println(ditdah_to_cw(ditdah_buffer,ditdah_buffer_len));
+  clear_ditdah_buffer();
 }
 
 // Start the appropriate CW pulse for the right paddle
@@ -173,7 +178,7 @@ void loop() {
           start_cw_right();
       } else {
         if (cw_was_sent == 1 && millis() > last_pressed_at + dah_in_ms) {
-           handle_space();
+           handle_new_char();
            cw_was_sent = 0;
         }
       }
