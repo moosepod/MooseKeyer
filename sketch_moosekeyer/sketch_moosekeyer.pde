@@ -31,20 +31,21 @@
 #define STATE_CW_PAUSE             3
 
 // Global variables
-int co_tone          = 700;
-int wpm              = 0;
-int dit_in_ms        = 0;
-int dah_in_ms        = 0;
-int left_len         = 0;
-int right_len        = 0;
-int last_pressed     = LEFT_PADDLE;
-long last_pressed_at = 0;
-int cw_was_sent      = 0;
-int state            = STATE_KEYER_WAITING;
-int base_state       = STATE_KEYER_WAITING;
-long stop_cw_at      = 0;
-byte ditdah_buffer   = B00000000;
-int ditdah_buffer_len = 0;
+int  co_tone           = 700;
+int  wpm               = 0;
+int  dit_in_ms         = 0;
+int  dah_in_ms         = 0;
+int  left_len          = 0;
+int  right_len         = 0;
+int  last_pressed      = LEFT_PADDLE;
+long last_pressed_at   = 0;
+int  cw_was_sent       = 0;
+int  state             = STATE_KEYER_WAITING;
+int  base_state        = STATE_KEYER_WAITING;
+long stop_cw_at        = 0;
+byte ditdah_buffer     = B00000000;          // Accumulates dit/dahs for the current character
+int  ditdah_buffer_len = 0;                  // Total length of current character
+char cw_mapping[256];                        // Stores the associated character for each morse dit/dah set. Keyed on byte value.
 
 void debug_log(char *m) {
   Serial.println(m);
@@ -66,6 +67,11 @@ void setup_for_wpm(int new_wpm) {
   
   debug_log("Setting wpm to ");
   debug_log(wpm);
+  
+  for (int i=0; i < 256; i++) {
+    cw_mapping[i] = '?';
+  }
+  setup_cw_mappings();
 }
 
 int left = 0;
@@ -88,14 +94,14 @@ void add_to_ditdah_buffer(int x) {
   if (ditdah_buffer_len < 8) {
     ditdah_buffer_len +=1;
     if (x == DAH) {
-       bitSet(ditdah_buffer,8-ditdah_buffer_len);
+       bitSet(ditdah_buffer,7-ditdah_buffer_len);
     }
   }
 }
 
 // Clear the ditdah buffer
 void clear_ditdah_buffer() {
-   ditdah_buffer = B00000000;
+   ditdah_buffer = B10000000;
    ditdah_buffer_len = 0;
 }
 
@@ -140,7 +146,7 @@ char* ditdah_to_cw(byte ditdah, int len) {
   int i = 0;
   
   for (i = 0; i < len; i++) {
-    if (bitRead(ditdah,7-i)==1) {
+    if (bitRead(ditdah,6-i)==1) {
       cw[i] = '-';
     } else {
       cw[i] = '.';
@@ -154,7 +160,11 @@ char* ditdah_to_cw(byte ditdah, int len) {
 
 void handle_new_char() {
   Serial.write("Char: ");
-  Serial.println(ditdah_to_cw(ditdah_buffer,ditdah_buffer_len));
+  Serial.print(ditdah_to_cw(ditdah_buffer,ditdah_buffer_len));
+  Serial.print(" (");
+  Serial.print(byte(cw_mapping[ditdah_buffer]));
+  Serial.println(')');
+  
   clear_ditdah_buffer();
 }
 
@@ -216,4 +226,28 @@ void loop() {
       }
       break;
   }
+}
+
+void add_cw_mapping(char* cw, char mapped_char) {
+  byte b = B10000000;
+  for (int i = 0; i < strlen(cw); i++) {
+    if (cw[i] == '-') {
+      bitSet(b,6-i);
+    }
+  }
+  
+  cw_mapping[b] = mapped_char;
+  Serial.println(mapped_char);
+  Serial.println(b,BIN);
+  Serial.println(b,DEC);
+  
+}
+
+// Called at init to setup our mapping buffer
+void setup_cw_mappings() {
+  add_cw_mapping(".-",'A');
+  add_cw_mapping("-...",'B');
+  add_cw_mapping("-.-.",'C');
+  add_cw_mapping("-..",'D');
+  add_cw_mapping(".",'E');
 }
