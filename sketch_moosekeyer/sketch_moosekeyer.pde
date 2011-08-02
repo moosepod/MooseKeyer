@@ -89,19 +89,26 @@ void setup() {
   setup_for_wpm(INITIAL_WPM);
 }
 
-// Append a dit/dah to our current buffer
+// Append a dit/dah to our current buffer. buffer is 1-prefixed
+// to allow it to be converted to a unique int (otherwise .. and ... 
+// aren't distinguishable)
 void add_to_ditdah_buffer(int x) {
   if (ditdah_buffer_len < 8) {
-    ditdah_buffer_len +=1;
     if (x == DAH) {
-       bitSet(ditdah_buffer,7-ditdah_buffer_len);
+       bitSet(ditdah_buffer,ditdah_buffer_len);
+    } else {
+       bitClear(ditdah_buffer, ditdah_buffer_len);
     }
+    
+    bitSet(ditdah_buffer,ditdah_buffer_len+1);
+
+    ditdah_buffer_len +=1;
   }
 }
 
 // Clear the ditdah buffer
 void clear_ditdah_buffer() {
-   ditdah_buffer = B10000000;
+   ditdah_buffer = B00000000;
    ditdah_buffer_len = 0;
 }
 
@@ -146,7 +153,7 @@ char* ditdah_to_cw(byte ditdah, int len) {
   int i = 0;
   
   for (i = 0; i < len; i++) {
-    if (bitRead(ditdah,6-i)==1) {
+    if (bitRead(ditdah,i)==1) {
       cw[i] = '-';
     } else {
       cw[i] = '.';
@@ -229,11 +236,14 @@ void loop() {
 }
 
 void add_cw_mapping(char* cw, char mapped_char) {
-  byte b = B10000000;
+  byte b = B00000000;
   for (int i = 0; i < strlen(cw); i++) {
     if (cw[i] == '-') {
-      bitSet(b,6-i);
+      bitSet(b,i);
+    } else {
+      bitClear(b,i);
     }
+    bitSet(b,i+1);
   }
   
   cw_mapping[b] = mapped_char;
