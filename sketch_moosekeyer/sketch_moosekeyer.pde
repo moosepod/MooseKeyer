@@ -1,6 +1,20 @@
  // This sketch drives a combo keyer/code oscilator
 // See associated SCHEMATIC file for schematic
 
+/* Remaining todos:
+
+- Move to int, not byte, to handle prosigns
+- Add non-english chars
+- Make sure all chars represented
+- Add actual keying (with transistor)
+- Support mode switch with button
+- Fake a LCD output screen to serial
+- Support a straight key mode
+- Support a mode to switch WPM
+- Support a beacon mode
+- Support a USB keyboard mode
+*/
+
 #define DIT 1
 #define DAH 3
 
@@ -29,6 +43,20 @@
 #define STATE_SENDING_CW           1
 #define STATE_KEYER_BOTH_PRESSED   2
 #define STATE_CW_PAUSE             3
+
+// Prosigns, from http://en.wikipedia.org/wiki/Prosigns_for_Morse_code
+// We use low ascii chars to represent
+#define PROSIGN_AR  '\001'
+#define PROSIGN_AS  '\002'
+#define PROSIGN_BK  '\003'
+#define PROSIGN_BT  '\004'
+#define PROSIGN_CL  '\005'
+#define PROSIGN_CT  '\006'
+#define PROSIGN_DO  '\007'
+#define PROSIGN_KN  '\010'
+#define PROSIGN_SK  '\011'
+#define PROSIGN_SN  '\012'
+#define PROSIGN_ERROR '\013'
 
 // Global variables
 int  co_tone           = 700;
@@ -165,11 +193,57 @@ char* ditdah_to_cw(byte ditdah, int len) {
   return cw;
 }
 
+char* convert_ditdah_to_char(byte ditdah_buffer) {
+  char *c;
+  byte b = cw_mapping[ditdah_buffer];
+  
+  switch (b) {
+    case PROSIGN_AR:
+      c = "_AR_";
+      break;
+    case PROSIGN_AS:
+      c = "_AS_";
+      break;
+    case PROSIGN_BK:
+      c = "_AS_";
+      break;
+    case PROSIGN_BT:
+      c = "_BT_";
+      break;
+    case PROSIGN_CL:
+      c = "_CL_";
+      break;
+    case PROSIGN_CT:
+      c = "_CT_";
+      break;
+    case PROSIGN_DO:
+      c = "_DO_";
+      break;
+    case PROSIGN_KN:
+      c = "_KN_";
+      break;
+    case PROSIGN_SK:
+      c ="_SK_";
+      break;
+    case PROSIGN_SN:
+      c = "_SN_";
+      break;
+    case PROSIGN_ERROR:
+      c = "_ER_";
+      break;
+    default:
+      c = ".";
+      c[0] = b;
+  }
+  
+  return c;
+}
+
 void handle_new_char() {
   Serial.write("Char: ");
   Serial.print(ditdah_to_cw(ditdah_buffer,ditdah_buffer_len));
   Serial.print(" (");
-  Serial.print(byte(cw_mapping[ditdah_buffer]));
+  Serial.print(convert_ditdah_to_char(ditdah_buffer));
   Serial.println(')');
   
   clear_ditdah_buffer();
@@ -247,10 +321,6 @@ void add_cw_mapping(char* cw, char mapped_char) {
   }
   
   cw_mapping[b] = mapped_char;
-  Serial.println(mapped_char);
-  Serial.println(b,BIN);
-  Serial.println(b,DEC);
-  
 }
 
 // Called at init to setup our mapping buffer
@@ -260,4 +330,58 @@ void setup_cw_mappings() {
   add_cw_mapping("-.-.",'C');
   add_cw_mapping("-..",'D');
   add_cw_mapping(".",'E');
+  add_cw_mapping("..-.",'F');
+  add_cw_mapping("--.",'G');
+  add_cw_mapping("....",'H');
+  add_cw_mapping("..",'I');
+  add_cw_mapping(".---",'J');
+  add_cw_mapping("-.-",'K');
+  add_cw_mapping(".-..",'L');
+  add_cw_mapping("--",'M');
+  add_cw_mapping("-.",'N');
+  add_cw_mapping("---",'O');
+  add_cw_mapping(".--.",'P');
+  add_cw_mapping("--.-",'Q');
+  add_cw_mapping(".-.",'R');
+  add_cw_mapping("...",'S');
+  add_cw_mapping("-",'T');
+  add_cw_mapping("..-",'U');
+  add_cw_mapping("...-",'V');
+  add_cw_mapping(".--",'W');
+  add_cw_mapping("-..-",'X');
+  add_cw_mapping("-.--",'Y');  
+  add_cw_mapping("--..",'Z');  
+  
+  add_cw_mapping("-----",'0');
+  add_cw_mapping(".----",'1');
+  add_cw_mapping("..---",'2');
+  add_cw_mapping("...--",'3');
+  add_cw_mapping("....-",'4');
+  add_cw_mapping(".....",'5');        
+  add_cw_mapping("-....",'6');
+  add_cw_mapping("--...",'7');
+  add_cw_mapping("---..",'8');
+  add_cw_mapping("----.",'9');
+  
+  add_cw_mapping(".-.-.-",'.');
+  add_cw_mapping("--..--",',');
+  add_cw_mapping("..--..",'?');
+  add_cw_mapping("..--.",'!');
+  add_cw_mapping("---...",':');
+  add_cw_mapping(".-..-.",'"');
+  add_cw_mapping(".----.",'\'');
+  add_cw_mapping("-...-",'=');
+  add_cw_mapping("-..-.",'/');
+
+  add_cw_mapping("........",PROSIGN_ERROR);
+  add_cw_mapping(".-.-.",PROSIGN_AR);
+  add_cw_mapping(".-...",PROSIGN_AS);
+  add_cw_mapping("-...-.-.",PROSIGN_BK);
+  add_cw_mapping("-...-",PROSIGN_BT);
+  add_cw_mapping("-.-..-..",PROSIGN_CL);
+  add_cw_mapping("-.-.-",PROSIGN_CT);
+  add_cw_mapping("-..---",PROSIGN_DO);
+  add_cw_mapping("-.--.",PROSIGN_KN);
+  add_cw_mapping("...-.-",PROSIGN_SK);
+  add_cw_mapping("...-.",PROSIGN_SN);
 }
